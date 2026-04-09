@@ -24,7 +24,7 @@ public class CryptoUtils {
 
     private void loadOrGenerateKey() {
         Path keyPath = Paths.get(KEY_FILE);
-        
+
         try {
             // Пробуем прочитать существующий ключ из файла
             if (Files.exists(keyPath)) {
@@ -33,7 +33,7 @@ public class CryptoUtils {
                 System.out.println("[КРИПТО] HMAC-ключ загружен из файла: " + KEY_FILE);
                 return;
             }
-            
+
             // Генерируем новый ключ и сохраняем его
             byte[] newKeyBytes = new byte[32];
             secureRandom.nextBytes(newKeyBytes);
@@ -41,7 +41,7 @@ public class CryptoUtils {
             hmacKey = Base64.getEncoder().encodeToString(newKeyBytes);
             System.out.println("[КРИПТО] Сгенерирован и сохранён новый HMAC-ключ");
             System.out.println("[КРИПТО] Файл ключа: " + KEY_FILE + " (НЕ КОММИТЬ В GIT!)");
-            
+
         } catch (Exception e) {
             System.err.println("[КРИПТО] Ошибка работы с файлом ключа: " + e.getMessage());
             // Фолбэк: генерируем ключ в памяти (будет несовместим между запусками)
