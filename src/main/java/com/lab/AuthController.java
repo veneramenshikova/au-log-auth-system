@@ -126,4 +126,8 @@ public class AuthController {
     public void generateRandomData() {
         crypto.logRandomBytesDemo();
     }
+
+    public Database getDatabase() {
+        return database;
+    }
 }
