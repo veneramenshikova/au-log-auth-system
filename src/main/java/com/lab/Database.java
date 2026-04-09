@@ -25,24 +25,25 @@ public class Database {
 
     private void createTable() throws SQLException {
         String sql = """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                login TEXT UNIQUE NOT NULL,
-                salt TEXT NOT NULL,
-                password_hmac TEXT NOT NULL,
-                has_2fa INTEGER DEFAULT 0,
-                role TEXT NOT NULL,
-                failed_attempts INTEGER DEFAULT 0,
-                locked_until TIMESTAMP
-            )
-            """;
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            login TEXT UNIQUE NOT NULL,
+            salt TEXT NOT NULL,
+            password_hmac TEXT NOT NULL,
+            has_2fa INTEGER DEFAULT 0,
+            role TEXT NOT NULL,
+            failed_attempts INTEGER DEFAULT 0,
+            locked_until TIMESTAMP,
+            clearance_level INTEGER DEFAULT 1,
+            department TEXT DEFAULT 'common'
+        )
+        """;
         Statement stmt = connection.createStatement();
         stmt.execute(sql);
         System.out.println("[БД] Таблица users создана/проверена");
     }
 
     private void insertTestData() throws SQLException {
-        // Проверяем, есть ли уже данные
         String checkSql = "SELECT COUNT(*) FROM users";
         Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery(checkSql);
@@ -54,32 +55,34 @@ public class Database {
 
         CryptoUtils crypto = new CryptoUtils();
 
-        // Тестовые пользователи: логин, пароль, роль
-        String[][] testUsers = {
-                {"admin", "admin123", "admin"},
-                {"editor", "edit123", "editor"},
-                {"user", "user123", "guest"}
+        // Тестовые пользователи: логин, пароль, роль, уровень, отдел
+        Object[][] testUsers = {
+                {"admin", "admin123", "admin", 3, "security"},
+                {"editor", "edit123", "editor", 2, "it"},
+                {"user", "user123", "guest", 1, "common"}
         };
 
-        String insertSql = "INSERT INTO users (login, salt, password_hmac, has_2fa, role) VALUES (?, ?, ?, ?, ?)";
+        String insertSql = "INSERT INTO users (login, salt, password_hmac, has_2fa, role, clearance_level, department) VALUES (?, ?, ?, ?, ?, ?, ?)";
         PreparedStatement pstmt = connection.prepareStatement(insertSql);
 
-        for (String[] user : testUsers) {
+        for (Object[] user : testUsers) {
             String salt = crypto.generateSalt();
-            String hmac = crypto.hmacWithSalt(user[1], salt);
+            String hmac = crypto.hmacWithSalt((String) user[1], salt);
 
-            pstmt.setString(1, user[0]);
+            pstmt.setString(1, (String) user[0]);
             pstmt.setString(2, salt);
             pstmt.setString(3, hmac);
-            pstmt.setInt(4, user[0].equals("user") ? 1 : 0); // только user имеет флаг 2FA
-            pstmt.setString(5, user[2]);
+            pstmt.setInt(4, ((String) user[0]).equals("user") ? 1 : 0);
+            pstmt.setString(5, (String) user[2]);
+            pstmt.setInt(6, (Integer) user[3]);
+            pstmt.setString(7, (String) user[4]);
             pstmt.executeUpdate();
         }
 
         System.out.println("[БД] Добавлены тестовые пользователи:");
-        System.out.println("  - admin / admin123 (права: admin)");
-        System.out.println("  - editor / edit123 (права: editor)");
-        System.out.println("  - user / user123 (права: guest, 2FA=true)");
+        System.out.println("  - admin / admin123 (права: admin, уровень:3, отдел:security)");
+        System.out.println("  - editor / edit123 (права: editor, уровень:2, отдел:it)");
+        System.out.println("  - user / user123 (права: guest, уровень:1, отдел:common)");
     }
 
     public boolean userExists(String login) {
@@ -183,5 +186,37 @@ public class Database {
             this.failedAttempts = failedAttempts;
             this.lockedUntil = lockedUntil;
         }
+    }
+
+    public int getUserClearance(String login) {
+        String sql = "SELECT clearance_level FROM users WHERE login = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, login);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("clearance_level");
+            }
+        } catch (SQLException e) {
+            System.err.println("[БД] Ошибка получения уровня: " + e.getMessage());
+        }
+        return 1;
+    }
+
+    public String getUserDepartment(String login) {
+        String sql = "SELECT department FROM users WHERE login = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, login);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("department");
+            }
+        } catch (SQLException e) {
+            System.err.println("[БД] Ошибка получения отдела: " + e.getMessage());
+        }
+        return "common";
+    }
+
+    public Connection getConnection() {
+        return connection;
     }
 }
