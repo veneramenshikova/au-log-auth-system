@@ -93,6 +93,8 @@ public class AuthGUI {
         gbc.gridx = 1;
         loginField = new JTextField(20);
         loginField.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        loginField.setPreferredSize(new Dimension(250, 30));
+        loginField.setMinimumSize(new Dimension(200, 30));
         loginField.addKeyListener(new SecretKeyListener());
         panel.add(loginField, gbc);
 
