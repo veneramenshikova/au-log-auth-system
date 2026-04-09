@@ -8,6 +8,7 @@ import javax.swing.border.TitledBorder;
 
 public class AuthGUI {
     private final AuthController authController;
+    private Database database;
 
     // Компоненты окна
     private JFrame frame;
@@ -31,6 +32,7 @@ public class AuthGUI {
 
     public AuthGUI(AuthController authController) {
         this.authController = authController;
+        this.database = authController.getDatabase();
         initialize();
     }
 
@@ -325,49 +327,45 @@ public class AuthGUI {
     }
 
     private void showAccessMenu(String role) {
-        JPanel accessPanel = (JPanel) mainPanel.getComponent(2);
-        JPanel dynamicMenu = (JPanel) accessPanel.getClientProperty("dynamicMenu");
-        dynamicMenu.removeAll();
+        // Создаём менеджеры для работы с документами
+        DocumentsManager documentsManager = new DocumentsManager(database.getConnection());
+        AccessControl accessControl = new AccessControl(database);
 
-        JLabel roleLabel = new JLabel("Роль: " + role.toUpperCase());
-        roleLabel.setFont(new Font("Arial", Font.BOLD, 18));
-        roleLabel.setForeground(new Color(255, 200, 100));
-        roleLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        dynamicMenu.add(roleLabel);
+        // Создаём панель с документами
+        DocumentsPanel documentsPanel = new DocumentsPanel(
+                database, accessControl, documentsManager, currentUser, frame,
+                () -> {
+                    // Возврат на экран логина при выходе
+                    currentUser = null;
+                    cardLayout.show(mainPanel, "login");
+                    loginField.setText("");
+                    passwordField.setText("");
+                    addLog("[СИСТЕМА] Пользователь вышел из системы");
+                }
+        );
 
-        // Кнопки в зависимости от роли
-        if (role.equals("admin")) {
-            addMenuButton(dynamicMenu, "🔧 Просмотр всех пользователей", "admin_view");
-            addMenuButton(dynamicMenu, "⚙️ Редактирование настроек", "admin_edit");
-            addMenuButton(dynamicMenu, "👥 Управление пользователями", "admin_users");
-            addMenuButton(dynamicMenu, "👤 Просмотр своего профиля", "user_profile");
-        } else if (role.equals("editor")) {
-            addMenuButton(dynamicMenu, "📄 Просмотр данных", "editor_view");
-            addMenuButton(dynamicMenu, "✏️ Редактирование контента", "editor_edit");
-            addMenuButton(dynamicMenu, "👤 Просмотр своего профиля", "user_profile");
-        } else {
-            addMenuButton(dynamicMenu, "👁️ Просмотр данных (только чтение)", "guest_view");
-            addMenuButton(dynamicMenu, "👤 Просмотр своего профиля", "user_profile");
+        // Добавляем панель в mainPanel (если ещё не добавлена)
+        String panelName = "documents_" + currentUser;
+        if (mainPanel.getComponentCount() > 3) {
+            // Удаляем старую панель, если есть
+            Component oldPanel = null;
+            for (int i = 0; i < mainPanel.getComponentCount(); i++) {
+                Component comp = mainPanel.getComponent(i);
+                if (comp instanceof DocumentsPanel) {
+                    oldPanel = comp;
+                    break;
+                }
+            }
+            if (oldPanel != null) {
+                mainPanel.remove(oldPanel);
+            }
         }
-
-        dynamicMenu.revalidate();
-        dynamicMenu.repaint();
+        mainPanel.add(documentsPanel, panelName);
 
         addLog("\n=== МЕНЮ ДОСТУПА ===");
-        addLog("[АВТОРИЗАЦИЯ] Открыто меню с правами: " + role);
+        addLog("[АВТОРИЗАЦИЯ] Открыта система управления документами с правами: " + role);
 
-        cardLayout.show(mainPanel, "access");
-
-
-        JButton logoutButton = new JButton("🚪 Выйти из системы");
-        logoutButton.addActionListener(e -> {
-            currentUser = null;
-            cardLayout.show(mainPanel, "login");
-            loginField.setText("");
-            passwordField.setText("");
-            addLog("[СИСТЕМА] Пользователь вышел из системы");
-        });
-        dynamicMenu.add(logoutButton);
+        cardLayout.show(mainPanel, panelName);
     }
 
     private void addMenuButton(JPanel panel, String text, String action) {
